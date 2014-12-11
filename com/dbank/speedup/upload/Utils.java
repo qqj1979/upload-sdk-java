@@ -40,6 +40,8 @@ import sun.misc.BASE64Encoder;
  */
 public class Utils
 {
+    public static int timeOffset = 0;
+    
     public static final String ENCODING = "UTF-8";
 
     private static final String HMAC_SHA1 = "HmacSHA1";
