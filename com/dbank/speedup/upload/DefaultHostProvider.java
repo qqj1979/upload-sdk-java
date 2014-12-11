@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Locale;
@@ -34,7 +35,7 @@ public class DefaultHostProvider implements HostProvider
         TreeMap<String, String> mergedParams = new TreeMap<String, String>();
         mergedParams.put("nsp_app", appId);
         mergedParams.put("nsp_fmt", "JSON");
-        mergedParams.put("nsp_ts", String.valueOf(System.currentTimeMillis() / 1000));
+        mergedParams.put("nsp_ts", String.valueOf(System.currentTimeMillis() / 1000 + Utils.timeOffset));
         mergedParams.put("nsp_ver", "1.0");
         mergedParams.put("nsp_svc", "nsp.ping.getupsrvip");
 
@@ -67,7 +68,7 @@ public class DefaultHostProvider implements HostProvider
             }
 
             @Override
-            public String callback(int code, InputStream body) throws IOException
+            public String callback(HttpURLConnection connection, int code, InputStream body) throws IOException
             {
                 String content = Utils.toString(body);
                 if (log.isDebugEnabled())
@@ -82,11 +83,23 @@ public class DefaultHostProvider implements HostProvider
                 String ip = (String)result.get("ip");
                 if (ip == null || ip.isEmpty())
                 {
+                    //可能是时间戳不对，更新一下偏移量
+                    updateTimeOffset(connection);
                     throw new IOException("can't get upload host,code=" + code + ",body=" + content);
                 }
                 return ip;
             }
         });
+    }
+
+    private void updateTimeOffset(HttpURLConnection connection)
+    {
+        long serverTime = connection.getHeaderFieldDate("Date", 1);
+        if (serverTime == 1)
+        {
+            return;
+        }
+        Utils.timeOffset = (int)((serverTime - System.currentTimeMillis()) / 1000);
     }
 
     private String generatePostData(TreeMap<String, String> mergedParams)
@@ -121,5 +134,14 @@ public class DefaultHostProvider implements HostProvider
                     .append(entry.getValue());
         }
         return Utils.tomd5(keyBuilder.toString()).toUpperCase(Locale.getDefault());
+    }
+
+    public static void main(String[] args) throws IOException
+    {
+        DefaultHostProvider provider = new DefaultHostProvider();
+        Map<String, String> params = new HashMap<String, String>();
+        params.put("rip", "");
+        System.out.println(provider.getUploadHost("60850", "yuaHJ4GEaoCXGIV2WRgWlGsvROhITUIg", params));
+//        System.out.println(provider.getUploadHost("50985","test50985bba8df90acb8eb160a8087f",params));
     }
 }
